@@ -36,7 +36,7 @@ bool hasStartedCountdown = false; // 是否已開始倒計時
 unsigned long lastSecondUpdate;    // 用于追踪最后更新时间
 unsigned long countdownStart = 0;
 unsigned long remainingTime = 0; // 剩餘倒計時時間
-int countdownTime = 6; // 60秒倒計時
+int countdownTime = 10; // 60秒倒計時
 
 enum Mode { PUSH_UP, SIT_UP, SQUAT };
 Mode currentMode = PUSH_UP;
@@ -147,27 +147,32 @@ void detectMotion() {
   }
 
   // 深蹲
-  else if (currentMode == SQUAT) {
-    if (mpu.getAngleZ() > 45) {
-      if (!isDown) {
-        count_squat++;
-        isDown = true;
-        Serial.println("深蹲次數: " + String(count_squat));
-        displayText();
+else if (currentMode == SQUAT) {
+  float angleY = mpu.getAngleY(); // 獲取Z軸角度
+  Serial.print("Z軸角度: ");
+  Serial.println(angleY); // 輸出當前Z軸角度，方便調試
 
-        // 檢查是否需要開始倒計時
-        if (!hasStartedCountdown) {
-          hasStartedCountdown = true; // 設置已開始倒計時
-          isCountdown = true; // 開始倒計時
-          countdownStart = millis(); // 設定倒計時開始時間
-          remainingTime = countdownTime; // 設定剩餘時間為60秒
-          lastSecondUpdate = countdownStart; // 更新最後一次計時時間
-        }
+  if (angleY > 30) {  // 可嘗試調整這裡的角度範圍
+    if (!isDown) {
+      count_squat++;
+      isDown = true;
+      Serial.println("深蹲次數: " + String(count_squat));
+      displayText();
+
+      // 檢查是否需要開始倒計時
+      if (!hasStartedCountdown) {
+        hasStartedCountdown = true;
+        isCountdown = true;
+        countdownStart = millis();
+        remainingTime = countdownTime;
+        lastSecondUpdate = countdownStart;
       }
-    } else if (mpu.getAngleZ() < 20) {
-      isDown = false;
     }
+  } else if (angleY < 10) { // 調整這裡的範圍以符合動作返回原始狀態的角度
+    isDown = false;
   }
+}
+
 }
 
 // 开始倒计时
@@ -205,15 +210,15 @@ void displayText() {
       break;
   }
 
-  // 倒計時秒數
+  // 倒計時秒數和 END 顯示控制
   if (isCountdown) {
     u8g2.setCursor(0, 60);
     u8g2.print("Time: ");
     u8g2.print(remainingTime); // 顯示剩餘時間
   } else {
-    if (remainingTime <= 0) {
-      u8g2.setCursor(0, 60);
-      u8g2.print("------------END------------"); // 倒計時結束顯示 END
+    if (remainingTime <= 0 && hasStartedCountdown) {
+        u8g2.setCursor(0, 60);
+        u8g2.print("------------END------------"); // 倒計時結束顯示 END
     }
   }
 
@@ -222,76 +227,71 @@ void displayText() {
 
 // 燒香拜拜不要出錯主程式區
 void loop() {
-  static unsigned long buttonPressStartTime = 0;
-  int buttonState = digitalRead(buttonPin);
+    static unsigned long buttonPressStartTime = 0;
+    int buttonState = digitalRead(buttonPin);
 
-  // 按鈕邏輯
-  if (buttonState == LOW) {
-    if (buttonPressStartTime == 0) {
-      buttonPressStartTime = millis();  // 記錄按鈕按下的時間
-    } 
-  } else {
-    if (buttonPressStartTime > 0) {
-      // 短按邏輯，檢查按鈕按下的時間
-      if (millis() - buttonPressStartTime < 1000) {
-        // 只有在不在倒計時中時，才可以切換動作
-        if (!isCountdown) {
-          // 短按切換動作
-          switch (currentMode) {
-            case PUSH_UP:
-              currentMode = SIT_UP;
-              Serial.println("切換到仰臥起坐");
-              break;
-            case SIT_UP:
-              currentMode = SQUAT;
-              Serial.println("切換到深蹲");
-              break;
-            case SQUAT:
-              currentMode = PUSH_UP;
-              Serial.println("切換到伏地挺身");
-              break;
-          }
-          displayText();
-          delay(500); // 暫停500毫秒以避免偵測到按鈕動作
+    // 按鈕邏輯
+    if (buttonState == LOW) {
+        if (buttonPressStartTime == 0) {
+            buttonPressStartTime = millis();  // 記錄按鈕按下的時間
         }
-      }
-      // 長按邏輯
-      else {
-        // 開始偵測
-        if (!isDetecting) {
-          isDetecting = true;
-          Serial.println("開始偵測動作");
-          flashOnce(greenColor); // 綠燈閃爍表示開始偵測
-        } else {
-          // 暫停或繼續偵測
-          isDetecting = false;
-          Serial.println("停止偵測動作");
-          flashOnce(redColor); // 紅燈閃爍表示停止偵測
+    } else {
+        if (buttonPressStartTime > 0) {
+            // 短按邏輯，檢查按鈕按下的時間
+            if (millis() - buttonPressStartTime < 1000) {
+                if (!isDetecting) {
+                    currentMode = (Mode)((currentMode + 1) % 3);  // 切換動作
+                    Serial.print("切換動作: ");
+                    switch (currentMode) {
+                      case PUSH_UP: Serial.println("伏地挺身"); flashOnce(blueColor); break;
+                      case SIT_UP: Serial.println("仰臥起坐"); flashOnce(purpleColor); break;
+                      case SQUAT: Serial.println("深蹲"); flashOnce(yellowColor); break;
+                    }
+                    displayText(); // 顯示當前動作
+                }
+            } else {
+                // 長按邏輯
+                if (!isDetecting) {
+                    isDetecting = true;  // 啟用偵測
+                    Serial.println("開始運動偵測");
+                    flashOnce(greenColor); // 開始偵測
+                } else if (isCountdown && !isCountdownPaused) {
+                    isCountdownPaused = true;  // 暫停倒計時
+                    Serial.println("暫停倒計時");
+                    flashOnce(redColor);
+                } else if (isCountdownPaused) {
+                    isCountdownPaused = false;  // 恢復倒計時
+                    Serial.println("繼續倒計時");
+                    flashOnce(greenColor);
+                }
+            }
+            buttonPressStartTime = 0;  // 重置按鈕按下時間
         }
-      }
-      buttonPressStartTime = 0; // 重置按鈕按下時間
     }
-  }
 
-  // 更新倒計時
-  if (isCountdown) {
-    unsigned long currentMillis = millis();
-    if (currentMillis - lastSecondUpdate >= 1000) { // 每秒更新
-      remainingTime--;
-      lastSecondUpdate = currentMillis;
+    // 檢測運動狀態
+    detectMotion();
 
-      if (remainingTime <= 0) {
-        isCountdown = false; // 倒計時結束
-        flashOnce(yellowColor); // 黃燈閃爍表示倒計時結束
-        count_push_up = count_sit_up = count_squat = 0; // 倒計時結束後次數歸零
-        displayText(); // 顯示
-      }
+    // 處理倒計時邏輯
+    if (isCountdown && !isCountdownPaused) {
+        unsigned long currentTime = millis();
+        if (currentTime - lastSecondUpdate >= 1000) {  // 每秒更新一次
+            remainingTime--;  // 減少剩餘時間
+            lastSecondUpdate = currentTime;  // 更新上次秒數更新的時間
+            displayText();
+        }
+
+        // 倒計時結束
+        if (remainingTime <= 0) {
+            Serial.println("倒計時結束");
+            isCountdown = false;
+            isDetecting = false; // 停止偵測
+            count_push_up = count_sit_up = count_squat = 0; // 歸零次數
+            setColor(0, 255, 0); // 綠燈長亮
+            displayText(); // 顯示 END 兩秒
+            delay(2000); // 延遲2秒顯示 END
+            hasStartedCountdown = false;
+            displayText(); // 倒數結束后更新顯示
+        }
     }
-  }
-
-  // 每次循環進行動作偵測
-  detectMotion();
-
-  // 每次循環更新顯示
-  displayText(); // 確保顯示始終更新
 }
