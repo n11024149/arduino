@@ -188,7 +188,7 @@ void displayText() {
   u8g2.drawStr(0, 30, user.c_str());
 
   // 顯示當前動作 次數
-  u8g2.setCursor(0, 45);
+  u8g2.setCursor(0, 50);
   switch (currentMode) {
     case PUSH_UP:
       u8g2.print("Push Up : ");
