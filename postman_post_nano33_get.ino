@@ -67,18 +67,15 @@ void loop() {
                 return;
               }
 
-              // 提取欄位
+              // 提取特定欄位，忽略其他不必要欄位
               int id = doc["id"];                 // 獲取 id
               const char* name = doc["name"];     // 獲取 name
-              const char* status = doc["status"];  // 獲取 status
 
               // 打印提取的欄位
               Serial.print("ID: ");
               Serial.println(id);
               Serial.print("名稱: ");
               Serial.println(name);
-              Serial.print("狀態: ");
-              Serial.println(status);
 
               // 返回成功響應
               client.println("HTTP/1.1 200 OK");
