@@ -9,7 +9,7 @@
 // WiFi and Server Settings
 const char* ssid = "C219-1";
 const char* password = "CsieC219";
-const char* serverName = "RASPBERRYPI_IP";
+const char* serverName = "10.142.3.212";
 String apiKeyValue = "lkjhgfdsa";
 String sensorName = "location";
 String sensorLocation = "NHUgym-270F";
@@ -72,9 +72,9 @@ void sendExerciseData() {
     String httpRequestData = "api_key=" + apiKeyValue
                           + "&sensor=" + user
                           + "&location=" + sensorLocation
-                          + "&push_ups=" + String(count_push_up)
-                          + "&sit_ups=" + String(count_sit_up)
-                          + "&squats=" + String(count_squat);
+                          + "&value1=" + String(count_push_up)
+                          + "&value2=" + String(count_sit_up)
+                          + "&value3=" + String(count_squat);
     
     Serial.print("POST : ");
     Serial.println(httpRequestData);
