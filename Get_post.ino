@@ -53,7 +53,7 @@ const int greenColor[3] = {0, 255, 0};
 // WiFi Server
 WiFiServer server(serverPort);
 
-// HTTP server
+// color
 void setColor(int red, int green, int blue) {
   analogWrite(redPin, red);
   analogWrite(greenPin, green);
@@ -239,7 +239,7 @@ void setup() {
 
   String fv = WiFi.firmwareVersion();
   if (fv < WIFI_FIRMWARE_LATEST_VERSION) {
-    Serial.println("請更新韌體");
+    Serial.println("請更新韌體 不更新也沒差");
   }
 
   // 連接 WiFi
