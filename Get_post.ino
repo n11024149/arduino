@@ -75,7 +75,7 @@ void sendExerciseData() {
     HttpClient http(client, serverName, 80);
     
     String httpRequestData = "api_key=" + apiKeyValue
-                          + "&sensor=" + user
+                          + "&user=" + user
                           + "&location=" + sensorLocation
                           + "&value1=" + String(count_push_up)
                           + "&value2=" + String(count_sit_up)
