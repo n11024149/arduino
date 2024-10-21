@@ -7,15 +7,13 @@
 #include <U8g2lib.h>
 
 // WiFi and Server Settings
-const char* ssid = "SSID";
-const char* password = "PASSWORD";
+const char* ssid = "C219-1";
+const char* password = "CsieC219";
 const char* serverName = "RASPBERRYPI_IP";
 String apiKeyValue = "lkjhgfdsa";
 String sensorName = "location";
 String sensorLocation = "NHUgym-270F";
 String user = "User 1";
-unsigned long lastTime = 0;
-unsigned long timerDelay = 3000;
 
 // MPU6050, LED, OLED
 MPU6050 mpu(Wire);
@@ -39,7 +37,7 @@ bool hasStartedCountdown = false;
 unsigned long lastSecondUpdate;
 unsigned long countdownStart = 0;
 unsigned long remainingTime = 0;
-int countdownTime = 10;
+int countdownTime = 60; // 修改為60秒
 
 enum Mode { PUSH_UP, SIT_UP, SQUAT };
 Mode currentMode = PUSH_UP;
@@ -51,16 +49,13 @@ const int purpleColor[3] = {255, 0, 255};
 const int yellowColor[3] = {255, 255, 0};
 const int greenColor[3] = {0, 255, 0};
 
-// OLED display variables
-
 // Function to set RGB LED color
 void setColor(int red, int green, int blue) {
-  analogWrite(redPin, red); // redpin-red
-  analogWrite(greenPin, green); // greenpin-green
-  analogWrite(bluePin, blue); // bluepin-blue
+  analogWrite(redPin, red);
+  analogWrite(greenPin, green);
+  analogWrite(bluePin, blue);
 }
 
-// RGB LED Flash
 void flashOnce(const int color[3]) {
   setColor(color[0], color[1], color[2]);
   delay(500);
@@ -100,7 +95,6 @@ void sendExerciseData() {
   }
 }
 
-// Setting dont move
 void setup() {
   Serial.begin(115200);
   Wire.begin();
@@ -127,9 +121,7 @@ void setup() {
   isDetecting = false;
 }
 
-// Motion detection function (unchanged from original)
 void detectMotion() {
-  // [Previous detectMotion code remains the same]
   if (!isDetecting) return;
   mpu.update();
 
@@ -200,12 +192,11 @@ void detectMotion() {
   }
 }
 
-// OLED display function
 void displayText() {
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_ncenB08_tr);
 
-  u8g2.drawStr(0, 10, sensorName.c_str());
+  u8g2.drawStr(0, 10, sensorLocation.c_str());
   u8g2.drawStr(0, 30, user.c_str());
 
   // Action Switch
@@ -228,6 +219,9 @@ void displayText() {
   // Time--&END
   if (isCountdown) {
     u8g2.setCursor(0, 64);
+    if (isCountdownPaused) {
+      u8g2.print("PAUSED - ");
+    }
     u8g2.print("Time: ");
     u8g2.print(remainingTime);
   } else {
@@ -266,20 +260,14 @@ void loop() {
         if (!isDetecting) {
           isDetecting = true;
           Serial.println("開始運動偵測");
-          u8g2.setCursor(64, 64);
-          u8g2.print(" START ");
           flashOnce(greenColor);
         } else if (isCountdown && !isCountdownPaused) {
           isCountdownPaused = true;
           Serial.println("暫停倒數");
-          u8g2.setCursor(64, 64);
-          u8g2.print(" STOP ");
           flashOnce(redColor);
         } else if (isCountdownPaused) {
           isCountdownPaused = false;
           Serial.println("繼續倒數");
-          u8g2.setCursor(64, 64);
-          u8g2.print(" START ");
           flashOnce(greenColor);
         }
       }
@@ -289,36 +277,31 @@ void loop() {
 
   detectMotion();
 
-  // Countdown logic and data sending
+  // Countdown logic
   if (isCountdown && !isCountdownPaused) {
     unsigned long currentTime = millis();
     if (currentTime - lastSecondUpdate >= 1000) {
       remainingTime--;
       lastSecondUpdate = currentTime;
       displayText();
-    }
-
-    // Send data periodically
-    if ((millis() - lastTime) > timerDelay) {
-      sendExerciseData();
-      lastTime = millis();
-    }
-
-    // Countdown end
-    if (remainingTime <= 0) {
-      Serial.println("倒數結束");
-      isCountdown = false;
-      isDetecting = false;
       
-      // Send final data before resetting
-      sendExerciseData();
-      
-      count_push_up = count_sit_up = count_squat = 0;
-      setColor(0, 168, 0);
-      displayText();
-      delay(2000);
-      hasStartedCountdown = false;
-      displayText();
+      // Countdown end
+      if (remainingTime <= 0) {
+        Serial.println("倒數結束");
+        isCountdown = false;
+        isDetecting = false;
+        
+        // 只在倒數結束時發送數據
+        Serial.println("開始上傳運動數據...");
+        sendExerciseData();
+        
+        count_push_up = count_sit_up = count_squat = 0;
+        setColor(0, 168, 0);
+        displayText();
+        delay(2000);
+        hasStartedCountdown = false;
+        displayText();
+      }
     }
   }
 }
