@@ -6,7 +6,7 @@
 #include <SPI.h>
 #include <U8g2lib.h>
 
-// wifi 資料參數設定區
+// WiFi 資料參數設定區
 const char* ssid = "C219-1";
 const char* password = "CsieC219";
 const char* serverName = "10.142.3.212";
@@ -30,50 +30,52 @@ int count_sit_up = 0;
 int count_squat = 0;
 
 // 狀態模式參數
-bool isDown = false;
-bool isDetecting = false;
-bool isCountdown = false;
-bool isCountdownPaused = false;
-bool hasStartedCountdown = false;
-unsigned long lastSecondUpdate;
-unsigned long countdownStart = 0;
-unsigned long remainingTime = 0;
-int countdownTime = 10;
+bool isDown = false;  // 是否處於下沉狀態
+bool isDetecting = false;  // 是否正在偵測運動
+bool isCountdown = false;  // 是否正在倒數
+bool isCountdownPaused = false;  // 是否暫停倒數
+bool hasStartedCountdown = false;  // 是否已經開始倒數
+unsigned long lastSecondUpdate;  // 上次倒數更新的時間
+unsigned long countdownStart = 0;  // 倒數開始時間
+unsigned long remainingTime = 0;  // 剩餘時間
+int countdownTime = 10;  // 倒數時間設定
 
+// 動作模式枚舉
 enum Mode { PUSH_UP, SIT_UP, SQUAT };
-Mode currentMode = PUSH_UP;
+Mode currentMode = PUSH_UP;  // 當前的運動模式
 
-// 顏色
+// 顏色設定
 const int redColor[3] = {255, 0, 0};
 const int blueColor[3] = {0, 0, 255};
 const int purpleColor[3] = {255, 0, 255};
 const int yellowColor[3] = {255, 255, 0};
 const int greenColor[3] = {0, 255, 0};
 
-// WiFi Server
+// WiFi 伺服器
 WiFiServer server(serverPort);
 
-// color
+// 設定 LED 顏色
 void setColor(int red, int green, int blue) {
   analogWrite(redPin, red);
   analogWrite(greenPin, green);
   analogWrite(bluePin, blue);
 }
 
-// LED
+// LED 閃爍一次
 void flashOnce(const int color[3]) {
   setColor(color[0], color[1], color[2]);
   delay(500);
   setColor(0, 0, 0);
 }
 
-// post
+// 上傳運動數據的函式
 void sendExerciseData() {
   // 保持原有發送資料的功能不變
   if (WiFi.status() == WL_CONNECTED) {
     WiFiClient client;
     HttpClient http(client, serverName, 80);
     
+    // 構建 POST 請求數據
     String httpRequestData = "api_key=" + apiKeyValue
                           + "&user=" + user
                           + "&location=" + sensorLocation
@@ -84,6 +86,7 @@ void sendExerciseData() {
     Serial.print("POST : ");
     Serial.println(httpRequestData);
     
+    // 發送 POST 請求
     http.beginRequest();
     http.post("/post-esp-data.php");
     http.sendHeader("Content-Type", "application/x-www-form-urlencoded");
@@ -91,6 +94,7 @@ void sendExerciseData() {
     http.print(httpRequestData);
     http.endRequest();
     
+    // 取得伺服器回應
     int statusCode = http.responseStatusCode();
     String response = http.responseBody();
     
@@ -101,18 +105,18 @@ void sendExerciseData() {
   }
 }
 
-// OLED
+// 顯示文字到 OLED 的函式
 void displayText() {
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_ncenB08_tr);
 
-  // Location display
+  // 顯示位置資訊
   u8g2.drawStr(0, 10, sensorLocation.c_str());
   
-  // User display
+  // 顯示使用者名稱
   u8g2.drawStr(0, 25, user.c_str());
 
-  // Exercise count display
+  // 顯示運動次數
   u8g2.setCursor(0, 40);
   switch (currentMode) {
     case PUSH_UP:
@@ -129,7 +133,7 @@ void displayText() {
       break;
   }
 
-  // Countdown display
+  // 顯示倒數計時
   u8g2.setCursor(0, 55);
   if (isCountdown) {
     if (isCountdownPaused) {
@@ -145,7 +149,7 @@ void displayText() {
   u8g2.sendBuffer();
 }
 
-// action
+// 偵測運動動作的函式
 void detectMotion() {
   if (!isDetecting) return;
   
@@ -153,7 +157,8 @@ void detectMotion() {
   if (isCountdownPaused) return;
   
   mpu.update();
- // 伏地
+  
+  // 伏地挺身
   if (currentMode == PUSH_UP) {
     if (mpu.getAngleX() > 30) {
       if (!isDown) {
@@ -162,6 +167,7 @@ void detectMotion() {
         Serial.println("伏地挺身次數: " + String(count_push_up));
         displayText();
 
+        // 倒數計時尚未開始，則啟動
         if (!hasStartedCountdown) {
           hasStartedCountdown = true;
           isCountdown = true;
@@ -174,7 +180,8 @@ void detectMotion() {
       isDown = false;
     }
   }
- // 仰臥
+  
+  // 仰臥起坐
   else if (currentMode == SIT_UP) {
     if (mpu.getAngleY() > 45) {
       if (!isDown) {
@@ -195,7 +202,8 @@ void detectMotion() {
       isDown = false;
     }
   }
- // 深蹲
+  
+  // 深蹲
   else if (currentMode == SQUAT) {
     if (mpu.getAngleY() > 30) {
       if (!isDown) {
@@ -218,7 +226,7 @@ void detectMotion() {
   }
 }
 
-// setting
+// 初始化設定
 void setup() {
   Serial.begin(115200);
   Wire.begin();
@@ -237,172 +245,54 @@ void setup() {
     while (true);
   }
 
+  // 檢查韌體版本
   String fv = WiFi.firmwareVersion();
   if (fv < WIFI_FIRMWARE_LATEST_VERSION) {
     Serial.println("請更新韌體 不更新也沒差");
   }
 
-  // 連接 WiFi
+  // 連接到 WiFi
   Serial.print("正在連接到 WiFi");
   while (WiFi.begin(ssid, password) != WL_CONNECTED) {
     Serial.print(".");
     delay(1000);
   }
-  Serial.println("\nWiFi 連接成功！");
+  Serial.println(" 連接成功！");
   
-  // 打印網路資訊
-  IPAddress ip = WiFi.localIP();
-  Serial.print("IP 位址: ");
-  Serial.println(ip);
-  
-  // 啟動伺服器
-  server.begin();
-  
-  Serial.println("陀螺儀已就緒");
-  setColor(255, 0, 0);
-  isDetecting = false;
+  // 設定初始 LED 顏色
+  setColor(0, 0, 0);
+
+  // 設定初始顯示
+  displayText();
 }
 
-// 燒香拜拜 不要出錯
+// 主迴圈
 void loop() {
-  // 處理 WiFi 客戶端連接
-  WiFiClient client = server.available();
-  if (client) {
-    Serial.println("新客戶端連接");
-    String currentLine = "";
-    String postData = "";
-    bool isPost = false;
-    
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        
-        if (currentLine.indexOf("POST") == 0) {
-          isPost = true;
-        }
-        
-        if (c == '\n' && currentLine.length() == 0) {
-          if (isPost) {
-            delay(100);
-            
-            while (client.available()) {
-              char c = client.read();
-              postData += c;
-            }
-            
-            DynamicJsonDocument doc(1024);
-            DeserializationError error = deserializeJson(doc, postData);
-            
-            if (!error) {
-              const char* receivedId = doc["id"];
-              const char* receivedName = doc["name"];
-              
-              Serial.println("收到的數據：");
-              Serial.print("ID: ");
-              Serial.println(receivedId);
-              Serial.print("Name: ");
-              Serial.println(receivedName);
-              
-              if (String(receivedId) == sensorLocation) {
-                user = String(receivedName);
-                Serial.println("ID 匹配成功！");
-                Serial.print("更新後的 User 值: ");
-                Serial.println(user);
-                displayText(); // 更新顯示
-              }
-              
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: application/json");
-              client.println("Connection: close");
-              client.println();
-              client.println("{\"status\":\"success\",\"message\":\"數據已處理\"}");
-            } else {
-              client.println("HTTP/1.1 400 Bad Request");
-              client.println("Content-Type: application/json");
-              client.println("Connection: close");
-              client.println();
-              client.println("{\"status\":\"error\",\"message\":\"JSON解析失敗\"}");
-            }
-            break;
-          }
-        }
-        
-        if (c == '\n') {
-          currentLine = "";
-        } else if (c != '\r') {
-          currentLine += c;
-        }
-      }
-    }
-    client.stop();
-    Serial.println("客戶端斷開連接");
-  }
-
-  // 運動偵測邏輯
-  static unsigned long buttonPressStartTime = 0;
-  int buttonState = digitalRead(buttonPin);
-
-  if (buttonState == LOW) {
-    if (buttonPressStartTime == 0) {
-      buttonPressStartTime = millis();
-    }
-  } else {
-    if (buttonPressStartTime > 0) {
-      if (millis() - buttonPressStartTime < 1000) {
-        if (!isDetecting) {
-          currentMode = (Mode)((currentMode + 1) % 3);
-          Serial.print("切換動作: ");
-          switch (currentMode) {
-            case PUSH_UP: Serial.println("伏地挺身"); flashOnce(blueColor); break;
-            case SIT_UP: Serial.println("仰臥起坐"); flashOnce(purpleColor); break;
-            case SQUAT: Serial.println("深蹲"); flashOnce(yellowColor); break;
-          }
-          displayText();
-        }
-      } else {
-        if (!isDetecting) {
-          isDetecting = true;
-          Serial.println("開始運動偵測");
-          flashOnce(greenColor);
-        } else if (isCountdown && !isCountdownPaused) {
-          isCountdownPaused = true;
-          Serial.println("暫停倒數");
-          flashOnce(redColor);
-        } else if (isCountdownPaused) {
-          isCountdownPaused = false;
-          Serial.println("繼續倒數");
-          flashOnce(greenColor);
-        }
-      }
-      buttonPressStartTime = 0;
-    }
-  }
-
   detectMotion();
 
-  // 倒數計時邏輯
+  // 倒數計時處理
   if (isCountdown && !isCountdownPaused) {
-    unsigned long currentTime = millis();
-    if (currentTime - lastSecondUpdate >= 1000) {
+    unsigned long currentMillis = millis();
+
+    // 更新倒數時間
+    if (currentMillis - lastSecondUpdate >= 1000) {
       remainingTime--;
-      lastSecondUpdate = currentTime;
+      lastSecondUpdate = currentMillis;
       displayText();
-      
-      if (remainingTime <= 0) {
-        Serial.println("倒數結束");
-        isCountdown = false;
-        isDetecting = false;
-        
-        Serial.println("開始上傳運動數據...");
-        sendExerciseData();
-        
-        count_push_up = count_sit_up = count_squat = 0;
-        setColor(0, 168, 0);
-        displayText();
-        delay(2000);
-        hasStartedCountdown = false;
-        displayText();
-      }
+    }
+
+    // 倒數結束
+    if (remainingTime <= 0) {
+      isCountdown = false;
+      setColor(greenColor[0], greenColor[1], greenColor[2]);
+      delay(1000);  // 綠燈亮 1 秒
+      flashOnce(greenColor);
+      hasStartedCountdown = false;
+      remainingTime = countdownTime;
+      count_push_up = 0;
+      count_sit_up = 0;
+      count_squat = 0;
+      displayText();
     }
   }
 }
