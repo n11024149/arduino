@@ -6,7 +6,7 @@
 #include <SPI.h>
 #include <U8g2lib.h>
 
-// WiFi and Server Settings
+// wifi 資料參數設定區
 const char* ssid = "C219-1";
 const char* password = "CsieC219";
 const char* serverName = "10.142.3.212";
@@ -24,12 +24,12 @@ const int bluePin = 7;
 const int buttonPin = 2;
 U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI u8g2(U8G2_R0, /* cs=*/ 10, /* dc=*/ 9, /* reset=*/ 8);
 
-// Counter variables
+// 動作計數
 int count_push_up = 0;
 int count_sit_up = 0;
 int count_squat = 0;
 
-// State and mode variables
+// 狀態模式參數
 bool isDown = false;
 bool isDetecting = false;
 bool isCountdown = false;
@@ -43,7 +43,7 @@ int countdownTime = 10;
 enum Mode { PUSH_UP, SIT_UP, SQUAT };
 Mode currentMode = PUSH_UP;
 
-// Colors
+// 顏色
 const int redColor[3] = {255, 0, 0};
 const int blueColor[3] = {0, 0, 255};
 const int purpleColor[3] = {255, 0, 255};
@@ -53,14 +53,14 @@ const int greenColor[3] = {0, 255, 0};
 // WiFi Server
 WiFiServer server(serverPort);
 
-// Function declarations (保持原有函數不變)
+// HTTP server
 void setColor(int red, int green, int blue) {
   analogWrite(redPin, red);
   analogWrite(greenPin, green);
   analogWrite(bluePin, blue);
 }
 
-// 閃燈
+// LED
 void flashOnce(const int color[3]) {
   setColor(color[0], color[1], color[2]);
   delay(500);
@@ -145,7 +145,7 @@ void displayText() {
   u8g2.sendBuffer();
 }
 
-// 動作
+// action
 void detectMotion() {
   if (!isDetecting) return;
   
@@ -153,7 +153,7 @@ void detectMotion() {
   if (isCountdownPaused) return;
   
   mpu.update();
-
+ // 伏地
   if (currentMode == PUSH_UP) {
     if (mpu.getAngleX() > 30) {
       if (!isDown) {
@@ -174,6 +174,7 @@ void detectMotion() {
       isDown = false;
     }
   }
+ // 仰臥
   else if (currentMode == SIT_UP) {
     if (mpu.getAngleY() > 45) {
       if (!isDown) {
@@ -194,6 +195,7 @@ void detectMotion() {
       isDown = false;
     }
   }
+ // 深蹲
   else if (currentMode == SQUAT) {
     if (mpu.getAngleY() > 30) {
       if (!isDown) {
@@ -216,7 +218,7 @@ void detectMotion() {
   }
 }
 
-// 設定
+// setting
 void setup() {
   Serial.begin(115200);
   Wire.begin();
@@ -260,7 +262,8 @@ void setup() {
   setColor(255, 0, 0);
   isDetecting = false;
 }
-// 主迴圈
+
+// 燒香拜拜 不要出錯
 void loop() {
   // 處理 WiFi 客戶端連接
   WiFiClient client = server.available();
