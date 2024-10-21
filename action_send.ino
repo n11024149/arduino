@@ -37,7 +37,7 @@ bool hasStartedCountdown = false;
 unsigned long lastSecondUpdate;
 unsigned long countdownStart = 0;
 unsigned long remainingTime = 0;
-int countdownTime = 60; // 修改為60秒
+int countdownTime = 10; // 修改為60秒
 
 enum Mode { PUSH_UP, SIT_UP, SQUAT };
 Mode currentMode = PUSH_UP;
@@ -56,6 +56,7 @@ void setColor(int red, int green, int blue) {
   analogWrite(bluePin, blue);
 }
 
+// RGB LED Flash
 void flashOnce(const int color[3]) {
   setColor(color[0], color[1], color[2]);
   delay(500);
@@ -95,6 +96,7 @@ void sendExerciseData() {
   }
 }
 
+// Setting dont touch
 void setup() {
   Serial.begin(115200);
   Wire.begin();
@@ -115,12 +117,13 @@ void setup() {
   Serial.print("IP: ");
   Serial.println(WiFi.localIP());
 
-  Serial.println("陀螺儀 也好了");
+  Serial.println("陀螺儀也好了 加油喔");
   setColor(255, 0, 0);
   
   isDetecting = false;
 }
 
+// Motion detection function
 void detectMotion() {
   if (!isDetecting) return;
   mpu.update();
@@ -192,6 +195,7 @@ void detectMotion() {
   }
 }
 
+// OLED display variables
 void displayText() {
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_ncenB08_tr);
@@ -234,6 +238,7 @@ void displayText() {
   u8g2.sendBuffer();
 }
 
+//燒香拜拜不要出錯
 void loop() {
   static unsigned long buttonPressStartTime = 0;
   int buttonState = digitalRead(buttonPin);
