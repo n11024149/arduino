@@ -44,6 +44,7 @@ bool isUserVerified = false;  // 用於追踪用戶是否已驗證
 unsigned long buttonPressStartTime = 0;
 const unsigned long LONG_PRESS_TIME = 1000; // 長按閾值為1秒
 bool isLongPress = false;
+bool firstMotionDetected = false;  // 追踪是否偵測到第一個動作
 
 unsigned long lastSecondUpdate;
 unsigned long countdownStart = 0;
@@ -60,6 +61,7 @@ const int blueColor[3] = {0, 0, 255};
 const int purpleColor[3] = {255, 0, 255};
 const int yellowColor[3] = {255, 255, 0};
 const int greenColor[3] = {0, 255, 0};
+
 // 設定 LED 顏色
 void setColor(int red, int green, int blue) {
   analogWrite(redPin, red);
@@ -365,15 +367,16 @@ void loop() {
     if (!isLongPress && (currentMillis - buttonPressStartTime >= LONG_PRESS_TIME)) {
       isLongPress = true;
       if (isUserVerified) {
-        // 長按處理：控制偵測開始/暫停
+        // 長按處理：控制當前選擇的運動模式的偵測開始/暫停
         if (!isDetecting) {
-          // 開始新的運動session
+          // 開始運動偵測，但不立即開始倒數計時
           isDetecting = true;
-          isCountdown = true;
+          isCountdown = false;  // 等待第一個動作再開始倒數
           isCountdownPaused = false;
-          setColor(blueColor[0], blueColor[1], blueColor[2]); // 藍色表示開始
+          firstMotionDetected = false;  // 重置第一次動作偵測狀態
+          setColor(blueColor[0], blueColor[1], blueColor[2]); // 藍色表示準備開始
         } else {
-          // 暫停/繼續倒數計時
+          // 暫停/繼續當前運動的偵測
           isCountdownPaused = !isCountdownPaused;
           if (isCountdownPaused) {
             setColor(redColor[0], redColor[1], redColor[2]); // 紅色表示暫停
@@ -386,27 +389,25 @@ void loop() {
     }
   }
   
-  // 按鈕釋放
+  // 按鈕釋放 - 處理短按切換模式
   if (buttonState == HIGH && lastButtonState == LOW) {
-    if (isUserVerified && !isLongPress) {
-      // 短按處理：切換運動模式
-      if (isDetecting) {
-        switch (currentMode) {
-          case PUSH_UP:
-            currentMode = SIT_UP;
-            flashOnce(purpleColor);
-            break;
-          case SIT_UP:
-            currentMode = SQUAT;
-            flashOnce(yellowColor);
-            break;
-          case SQUAT:
-            currentMode = PUSH_UP;
-            flashOnce(blueColor);
-            break;
-        }
-        displayText();
+    if (isUserVerified && !isLongPress && !isDetecting) {  // 只有在未開始偵測時才能切換模式
+      // 切換運動模式
+      switch (currentMode) {
+        case PUSH_UP:
+          currentMode = SIT_UP;
+          flashOnce(purpleColor);
+          break;
+        case SIT_UP:
+          currentMode = SQUAT;
+          flashOnce(yellowColor);
+          break;
+        case SQUAT:
+          currentMode = PUSH_UP;
+          flashOnce(blueColor);
+          break;
       }
+      displayText();
     }
   }
   
@@ -429,6 +430,7 @@ void loop() {
     if (remainingTime <= 0) {
       isCountdown = false;
       isDetecting = false;
+      firstMotionDetected = false;  // 重置第一次動作偵測狀態
       setColor(greenColor[0], greenColor[1], greenColor[2]);
       delay(1000);
       flashOnce(greenColor);
