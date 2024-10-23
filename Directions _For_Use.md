@@ -66,7 +66,7 @@ RGB LED 用於指示系統狀態：
 - **接線方式**：
    - R → Arduino D6
    - G → Arduino D5
-   - B → Arduino D3
+   - B → Arduino D7
 
 ---
 
