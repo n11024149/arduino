@@ -11,12 +11,11 @@
    - 2.1 Arduino IDE 安裝
    - 2.2 必要庫安裝
 3. 程式架構與代碼說明
-   - 3.1 WiFi 連接與固定 IP 設定
-   - 3.2 JSON 數據處理
-   - 3.3 按鈕功能 (短按與長按)
-   - 3.4 動作偵測與倒數計時
-   - 3.5 OLED 顯示邏輯
-   - 3.6 RGB LED 狀態顯示
+   - 3.1 JSON 數據處理
+   - 3.2 按鈕功能 (短按與長按)
+   - 3.3 動作偵測與倒數計時
+   - 3.4 OLED 顯示邏輯
+   - 3.5 RGB LED 狀態顯示
 4. 操作流程
    - 4.1 選擇偵測動作
    - 4.2 開始偵測與暫停
@@ -86,32 +85,7 @@ RGB LED 用於指示系統狀態：
 
 ## 3. 程式架構與代碼說明
 
-### 3.1 WiFi 連接與固定 IP 設定
-程式首先連接至指定的 WiFi，並使用固定 IP 地址進行通信。
-
-- **WiFi 設定代碼**：
-```cpp
-#include <WiFiNINA.h>
-
-const char* ssid = "LAPTOP-H200NENE 7672";
-const char* password = "11024211";
-
-IPAddress local_IP(192, 168, 1, 200);  // 固定 IP
-IPAddress gateway(192, 168, 1, 1);  
-IPAddress subnet(255, 255, 255, 0);   
-
-void setupWiFi() {
-  if (WiFi.config(local_IP, gateway, subnet) == false) {
-    // 設定失敗
-  }
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-  }
-}
-```
-
-### 3.2 JSON 數據處理
+### 3.1 JSON 數據處理
 接收從伺服器端傳回的 JSON 格式數據，並解析更新顯示內容。
 
 ```cpp
@@ -127,7 +101,7 @@ if (myObject.hasOwnProperty("ID") && myObject.hasOwnProperty("name")) {
 }
 ```
 
-### 3.3 按鈕功能 (短按與長按)
+### 3.2 按鈕功能 (短按與長按)
 按鈕短按用來切換動作，長按用來開始或暫停偵測。
 
 - **按鈕邏輯**：
@@ -154,7 +128,7 @@ void loop() {
 }
 ```
 
-### 3.4 動作偵測與倒數計時
+### 3.3 動作偵測與倒數計時
 偵測完成一個動作後開始倒數，並顯示剩餘時間。
 
 ```cpp
@@ -179,7 +153,7 @@ void startCountdown() {
 }
 ```
 
-### 3.5 OLED 顯示邏輯
+### 3.4 OLED 顯示邏輯
 顯示目前偵測動作、使用者名稱、動作次數及倒數計時。
 
 ```cpp
@@ -198,7 +172,7 @@ void displayInfo(String action, String user, int count, int seconds) {
 }
 ```
 
-### 3.6 RGB LED 狀態顯示
+### 3.5 RGB LED 狀態顯示
 根據不同狀態改變 RGB LED 顏色。
 
 ```cpp
@@ -243,4 +217,3 @@ void updateLED(int state) {
 
 ---
 
-這是完整的使用手冊草稿，包含硬體連接、軟體設定、代碼邏輯以及操作步驟。如有其他需求或修正，請隨時告知。
