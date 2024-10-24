@@ -15,9 +15,8 @@ const char* externalApiHost = "192.168.0.7";  // 外部 API
 const int port = 3000;
 const char *endpoint = "/products";
 String apiKeyValue = "lkjhgfdsa";
-String sensorName = "location";
+//String sensorName = "location";
 String sensorLocation = "NHUgym-270F";
-String user = "User 1";
 
 // MPU6050, LED, OLED
 MPU6050 mpu(Wire);
@@ -50,6 +49,10 @@ unsigned long lastSecondUpdate;
 unsigned long countdownStart = 0;
 unsigned long remainingTime = 0;
 int countdownTime = 10;
+
+String displayName = "";     // 用於顯示在 OLED 上的 username
+String userId = "";         // 用於回傳數據的 user ID
+const int jsonSize = 512;   // 增加 JSON 文檔大小以確保足夠空間
 
 // 動作模式枚舉
 enum Mode { PUSH_UP, SIT_UP, SQUAT };
@@ -84,8 +87,8 @@ void displayText() {
   // 顯示位置資訊
   u8g2.drawStr(0, 10, sensorLocation.c_str());
   
-  // 顯示使用者名稱
-  u8g2.drawStr(0, 25, user.c_str());
+  // 顯示用戶名
+  u8g2.drawStr(0, 25, displayName.c_str());
 
   // 顯示運動次數
   u8g2.setCursor(0, 40);
@@ -129,59 +132,104 @@ void getExternalData() {
   if (client.connect(externalApiHost, port)) {
     Serial.println("Connected to API server");
     
+    // 發送 HTTP GET 請求
     client.print(String("GET ") + endpoint + " HTTP/1.1\r\n" +
                  "Host: " + externalApiHost + "\r\n" +
                  "Connection: close\r\n\r\n");
     
-    // 跳過 HTTP 標頭
-    while (client.connected()) {
-      String line = client.readStringUntil('\n');
-      if (line == "\r") {
-        break;
+    // 等待伺服器回應
+    unsigned long timeout = millis();
+    while (client.available() == 0) {
+      if (millis() - timeout > 5000) {
+        Serial.println(">>> Client Timeout !");
+        client.stop();
+        flashOnce(redColor);
+        return;
       }
     }
     
+    // 讀取完整回應
+    String response = "";
+    bool isBody = false;
+    
+    while (client.available()) {
+      String line = client.readStringUntil('\n');
+      
+      // 當遇到空行時，表示 headers 結束，接下來是 body
+      if (line == "\r") {
+        isBody = true;
+        continue;
+      }
+      
+      // 只儲存 body 部分
+      if (isBody) {
+        response += line;
+      }
+    }
+    
+    Serial.println("\nReceived Response:");
+    Serial.println(response);
+    
     // 解析 JSON 數組
-    StaticJsonDocument<400> doc; // 增加緩衝區大小
-    DeserializationError error = deserializeJson(doc, client);
+    StaticJsonDocument<jsonSize> doc;
+    DeserializationError error = deserializeJson(doc, response);
     
     if (error) {
       Serial.print("JSON parsing failed: ");
       Serial.println(error.c_str());
+      flashOnce(redColor);
       client.stop();
       return;
     }
     
-    // 檢查是否為數組
-    if (!doc.is<JsonArray>()) {
-      Serial.println("Response is not an array");
+    // 檢查是否為空數組
+    if (doc.size() == 0) {
+      Serial.println("Empty JSON array");
+      flashOnce(redColor);
       client.stop();
       return;
     }
     
-    // 獲取數組中的第一個對象
-    JsonObject obj = doc[0];
+    // 獲取第一個對象
+    JsonObject item = doc[0];
+    
+    // 檢查必要欄位是否存在
+    if (!item.containsKey("id") || !item.containsKey("username") || !item.containsKey("user")) {
+      Serial.println("Missing required fields in object");
+      flashOnce(redColor);
+      client.stop();
+      return;
+    }
     
     // 打印解析後的數據
     Serial.println("\nParsed data:");
     Serial.print("Received ID: ");
-    Serial.println(obj["id"].as<const char*>());
+    Serial.println(item["id"].as<const char*>());
     Serial.print("Expected ID: ");
     Serial.println(sensorLocation);
-    Serial.print("Received Name: ");
-    Serial.println(obj["name"].as<const char*>());
+    Serial.print("Username: ");
+    Serial.println(item["username"].as<const char*>());
+    Serial.print("User ID: ");
+    Serial.println(item["user"].as<const char*>());
     
-    // 比較 ID
-    if (String(obj["id"].as<const char*>()) == sensorLocation) {
-      user = obj["name"].as<String>();
+    // 比對 ID
+    if (String(item["id"].as<const char*>()) == sensorLocation) {
+      displayName = item["username"].as<String>();
+      userId = item["user"].as<String>();
       isUserVerified = true;
+      
       Serial.println("User verified successfully!");
+      Serial.print("Display Name: ");
+      Serial.println(displayName);
+      Serial.print("User ID: ");
+      Serial.println(userId);
+      
       displayText();
       flashOnce(greenColor);
     } else {
       Serial.println("Location mismatch! Verification failed.");
       Serial.print("Received ID: '");
-      Serial.print(obj["id"].as<const char*>());
+      Serial.print(item["id"].as<const char*>());
       Serial.print("', Expected: '");
       Serial.print(sensorLocation);
       Serial.println("'");
@@ -194,6 +242,7 @@ void getExternalData() {
     flashOnce(redColor);
   }
 }
+
 // 偵測運動動作的函式
 void detectMotion() {
   if (!isDetecting) return;
@@ -277,9 +326,9 @@ void sendExerciseData() {
     WiFiClient client;
     HttpClient http(client, serverName, 80);
     
-    // 構建 POST 請求數據
+    // 使用 userId 而不是顯示名稱來發送數據
     String httpRequestData = "api_key=" + apiKeyValue
-                          + "&user=" + user
+                          + "&user=" + userId           // 使用 userId 進行回傳
                           + "&location=" + sensorLocation
                           + "&value1=" + String(count_push_up)
                           + "&value2=" + String(count_sit_up)
@@ -288,7 +337,6 @@ void sendExerciseData() {
     Serial.print("POST to RPi: ");
     Serial.println(httpRequestData);
     
-    // 發送 POST 請求
     http.beginRequest();
     http.post("/post-esp-data.php");
     http.sendHeader("Content-Type", "application/x-www-form-urlencoded");
@@ -296,7 +344,6 @@ void sendExerciseData() {
     http.print(httpRequestData);
     http.endRequest();
     
-    // 取得伺服器回應
     int statusCode = http.responseStatusCode();
     String response = http.responseBody();
     
