@@ -7,14 +7,14 @@
 #include <U8g2lib.h>
 
 // WiFi 資料參數設定區
-const char* ssid = "C219-2";
-const char* password = "CsieC219";
+const char* ssid = "KC";
+const char* password = "kc911211";
 // Post
-const char* serverName = "192.168.12.17";  // post IP
+const char* serverName = "192.168.0.7";  // post IP
 const int serverPort = 3000;
 const char* severendpoint = "/poooost";
 // Get
-const char* externalApiHost = "192.168.12.17";  // get API
+const char* externalApiHost = "192.168.0.7";  // get API
 const int externalport = 3000;
 const char* externalendpoint = "/products";
 // String apiKeyValue = "lkjhgfdsa"; // 樹梅
@@ -200,7 +200,7 @@ void getExternalData() {
     JsonObject item = doc[0];
     
     // 檢查必要欄位是否存在
-    if (!item.containsKey("id") || !item.containsKey("username") || !item.containsKey("user")) {
+    if (!item.containsKey("machine") || !item.containsKey("username") || !item.containsKey("user")) {
       Serial.println("Missing required fields in object");
       flashOnce(redColor);
       client.stop();
@@ -209,9 +209,9 @@ void getExternalData() {
     
     // 打印解析後的數據
     Serial.println("\nParsed data:");
-    Serial.print("Received ID: ");
-    Serial.println(item["id"].as<const char*>());
-    Serial.print("Expected ID: ");
+    Serial.print("Received machine: ");
+    Serial.println(item["machine"].as<const char*>());
+    Serial.print("Expected machine: ");
     Serial.println(machine);
     Serial.print("Username: ");
     Serial.println(item["username"].as<const char*>());
@@ -219,7 +219,7 @@ void getExternalData() {
     Serial.println(item["user"].as<const char*>());
     
     // 比對 ID
-    if (String(item["id"].as<const char*>()) == machine) {
+    if (String(item["machine"].as<const char*>()) == machine) {
       displayName = item["username"].as<String>();
       userId = item["user"].as<String>();
       isUserVerified = true;
@@ -234,8 +234,8 @@ void getExternalData() {
       flashOnce(greenColor);
     } else {
       Serial.println("Location mismatch! Verification failed.");
-      Serial.print("Received ID: '");
-      Serial.print(item["id"].as<const char*>());
+      Serial.print("Received machine: '");
+      Serial.print(item["machine"].as<const char*>());
       Serial.print("', Expected: '");
       Serial.print(machine);
       Serial.println("'");
@@ -341,10 +341,10 @@ void deleteLastRecord() {
         
         if (!error) {
             // 假設回應是個數組且我們要最後一個記錄
-            String id = doc[0]["id"].as<String>();
+            String machineget = doc[0]["machine"].as<String>();
             
             // 使用獲取的 id 發送 DELETE 請求
-            client.del("/post/" + id);
+            client.del("/post/" + machineget);
             
             statusCode = client.responseStatusCode();
             Serial.print("Delete status code: ");
