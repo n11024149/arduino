@@ -9,14 +9,17 @@
 // WiFi 資料參數設定區
 const char* ssid = "KC";
 const char* password = "kc911211";
-const char* serverName = "10.142.3.212";  // 樹莓派的 IP
-const int serverPort = 80;
-const char* externalApiHost = "192.168.0.7";  // 外部 API
-const int port = 3000;
-const char *endpoint = "/products";
+const char* serverName = "192.168.0.7";  // post IP
+const int serverPort = 3000;
+const char* externalApiHost = "192.168.0.7";  // get API
+const int externalport = 3000;
+const char *externalendpoint = "/products";
 String apiKeyValue = "lkjhgfdsa";
 //String sensorName = "location";
-String sensorLocation = "NHUgym-270F";
+String machine = "NHUgym-270F";
+
+WiFiClient wifi;
+HttpClient client = HttpClient(wifi, serverName, serverPort);
 
 // MPU6050, LED, OLED
 MPU6050 mpu(Wire);
@@ -85,7 +88,7 @@ void displayText() {
   u8g2.setFont(u8g2_font_ncenB08_tr);
 
   // 顯示位置資訊
-  u8g2.drawStr(0, 10, sensorLocation.c_str());
+  u8g2.drawStr(0, 10, machine.c_str());
   
   // 顯示用戶名
   u8g2.drawStr(0, 25, displayName.c_str());
@@ -129,11 +132,11 @@ void getExternalData() {
   
   WiFiClient client;
   
-  if (client.connect(externalApiHost, port)) {
+  if (client.connect(externalApiHost, externalport)) {
     Serial.println("Connected to API server");
     
     // 發送 HTTP GET 請求
-    client.print(String("GET ") + endpoint + " HTTP/1.1\r\n" +
+    client.print(String("GET ") + externalendpoint + " HTTP/1.1\r\n" +
                  "Host: " + externalApiHost + "\r\n" +
                  "Connection: close\r\n\r\n");
     
@@ -206,14 +209,14 @@ void getExternalData() {
     Serial.print("Received ID: ");
     Serial.println(item["id"].as<const char*>());
     Serial.print("Expected ID: ");
-    Serial.println(sensorLocation);
+    Serial.println(machine);
     Serial.print("Username: ");
     Serial.println(item["username"].as<const char*>());
     Serial.print("User ID: ");
     Serial.println(item["user"].as<const char*>());
     
     // 比對 ID
-    if (String(item["id"].as<const char*>()) == sensorLocation) {
+    if (String(item["id"].as<const char*>()) == machine) {
       displayName = item["username"].as<String>();
       userId = item["user"].as<String>();
       isUserVerified = true;
@@ -231,7 +234,7 @@ void getExternalData() {
       Serial.print("Received ID: '");
       Serial.print(item["id"].as<const char*>());
       Serial.print("', Expected: '");
-      Serial.print(sensorLocation);
+      Serial.print(machine);
       Serial.println("'");
       flashOnce(redColor);
     }
@@ -320,43 +323,67 @@ void detectMotion() {
   }
 }
 
-// 發送數據到樹莓派 (原有的 POST 功能)
+// POST
 void sendExerciseData() {
   if (WiFi.status() == WL_CONNECTED) {
-    WiFiClient client;
-    HttpClient http(client, serverName, 80);
+    // 先刪除上一筆記錄
+    deleteLastRecord();
     
-    // 使用 userId 而不是顯示名稱來發送數據
-    String httpRequestData = "api_key=" + apiKeyValue
-                          + "&user=" + userId           // 使用 userId 進行回傳
-                          + "&location=" + sensorLocation
-                          + "&value1=" + String(count_push_up)
-                          + "&value2=" + String(count_sit_up)
-                          + "&value3=" + String(count_squat);
+    // 準備 JSON 數據
+    String contentType = "application/json";
+    String postData = "{""\"使用者ID\":\"" + userId + "\","
+                     "\"裝置名稱\":\"" + machine + "\","
+                     "\"伏地挺身\":" + String(count_push_up) + ","
+                     "\"仰臥起坐\":" + String(count_sit_up) + ","
+                     "\"深蹲\":" + String(count_squat) + "}";
     
-    Serial.print("POST to RPi: ");
-    Serial.println(httpRequestData);
+    // 發送 POST 請求
+    client.post("/post", contentType, postData);
     
-    http.beginRequest();
-    http.post("/post-esp-data.php");
-    http.sendHeader("Content-Type", "application/x-www-form-urlencoded");
-    http.sendHeader("Content-Length", httpRequestData.length());
-    http.print(httpRequestData);
-    http.endRequest();
+    int statusCode = client.responseStatusCode();
+    String response = client.responseBody();
     
-    int statusCode = http.responseStatusCode();
-    String response = http.responseBody();
-    
-    Serial.print("HTTP Status: ");
+    Serial.print("POST Status code: ");
     Serial.println(statusCode);
     Serial.print("Response: ");
     Serial.println(response);
   }
 }
 
-// 其他功能保持不變...
-//[原有的 setColor(), flashOnce(), displayText(), detectMotion() 等函式保持不變]
+// 更新POST記錄
+void deleteLastRecord() {
+    // 發送 GET 請求獲取最新記錄
+    client.get("/post");
+    
+    int statusCode = client.responseStatusCode();
+    String response = client.responseBody();
+    
+    if (statusCode == 200) {
+        // 從回應中提取 id
+        StaticJsonDocument<200> doc;
+        DeserializationError error = deserializeJson(doc, response);
+        
+        if (!error) {
+            // 假設回應是個數組且我們要最後一個記錄
+            String id = doc[0]["id"].as<String>();
+            
+            // 使用獲取的 id 發送 DELETE 請求
+            client.del("/post/" + id);
+            
+            statusCode = client.responseStatusCode();
+            Serial.print("Delete status code: ");
+            Serial.println(statusCode);
+            
+            response = client.responseBody();
+            Serial.print("Delete response: ");
+            Serial.println(response);
+        }
+    }
+    
+    delay(1000); // 等待刪除完成
+}
 
+// 設定
 void setup() {
   Serial.begin(115200);
   Wire.begin();
@@ -370,15 +397,16 @@ void setup() {
   pinMode(bluePin, OUTPUT);
 
   // 初始化狀態
-  isUserVerified = false;  // 初始化驗證狀態
-  isDetecting = false;     // 確保一開始不會進行動作偵測
+  isUserVerified = false;
+  isDetecting = false;
   isCountdown = false;
   isCountdownPaused = false;
   hasStartedCountdown = false;
 
-  // 連接到 WiFi
+  // 連接 WiFi
   Serial.print("Connecting to WiFi");
-  while (WiFi.begin(ssid, password) != WL_CONNECTED) {
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
     delay(1000);
   }
@@ -389,6 +417,7 @@ void setup() {
   displayText();
 }
 
+// 不要亂動喔 你最好保證他沒事 不然就是你要出事
 void loop() {
   static unsigned long lastGetRequest = 0;
   unsigned long currentMillis = millis();
