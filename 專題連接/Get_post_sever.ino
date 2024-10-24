@@ -14,8 +14,8 @@ const int serverPort = 3000;
 const char* externalApiHost = "192.168.0.7";  // get API
 const int externalport = 3000;
 const char *externalendpoint = "/products";
-String apiKeyValue = "lkjhgfdsa";
-//String sensorName = "location";
+// String apiKeyValue = "lkjhgfdsa"; // 樹梅
+// String sensorName = "location"; // 樹梅
 String machine = "NHUgym-270F";
 
 WiFiClient wifi;
